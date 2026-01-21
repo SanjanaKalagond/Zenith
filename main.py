@@ -5,10 +5,11 @@ from styles import apply_zenith_theme, zenith_card
 from reports import generate_full_zenith_report, send_email_report
 import pandas as pd
 import time
+import re
 
 st.set_page_config(
     page_title="Zenith", 
-    page_icon="", 
+    page_icon="✨", 
     layout="wide" if st.session_state.get("authenticated") else "centered", 
     initial_sidebar_state="expanded"
 )
@@ -25,6 +26,9 @@ if not firebase_admin._apps:
         st.error(f"Firebase Initialization Error: {e}")
 
 db = firestore.client()
+
+def is_valid_email(email):
+    return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
 if st.session_state.get("authenticated"):
     if st.sidebar.button("LOGOUT OF ZENITH"):
@@ -46,14 +50,20 @@ if not st.session_state.get("authenticated"):
             pwd = st.text_input("Password", type="password")
             vibe = st.selectbox("Choose Monthly Vibe", ["Growth", "Focus", "Zen", "Energy"])
             if st.form_submit_button("CREATE ACCOUNT"):
-                try:
-                    user = auth.create_user(email=email, password=pwd)
-                    db.collection("users").document(user.uid).set({
-                        "email": email, "vibe": vibe, "created_at": firestore.SERVER_TIMESTAMP
-                    })
-                    st.success("Account Created! Use the Login tab.")
-                except Exception as e:
-                    st.error(f"Signup failed: {e}")
+                if not is_valid_email(email):
+                    st.error("Please enter a valid email address.")
+                elif len(pwd) < 6:
+                    st.error("Password should be at least 6 characters.")
+                else:
+                    try:
+                        user = auth.create_user(email=email, password=pwd)
+                        db.collection("users").document(user.uid).set({
+                            "email": email, "vibe": vibe, "created_at": firestore.SERVER_TIMESTAMP
+                        })
+                        st.success("Account Created! Use the Login tab.")
+                        st.info("Note: In production, you would check your inbox for a verification link.")
+                    except Exception as e:
+                        st.error(f"Signup failed: {e}")
 
     with mode[0]: 
         with st.form("login"):
@@ -62,15 +72,21 @@ if not st.session_state.get("authenticated"):
             if st.form_submit_button("ENTER ZENITH"):
                 try:
                     user = auth.get_user_by_email(l_email)
+                    
+
+                    if not user.email_verified:
+                        st.warning("Email not verified. Proceeding for Demo...")
+                    
                     st.session_state.user = user.uid
                     st.session_state.authenticated = True
                     st.success("Identity Verified.")
                     time.sleep(0.5)
                     st.rerun() 
                 except Exception:
-                    st.error("Invalid credentials.")
+                    st.error("Invalid credentials or user does not exist.")
 
 else:
+    # ---------------- DASHBOARD ----------------
     st.markdown('<style>section[data-testid="stSidebarNav"] {display: block !important;}</style>', unsafe_allow_html=True)
     
     user_id = st.session_state.user
