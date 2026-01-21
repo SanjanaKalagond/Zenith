@@ -8,7 +8,7 @@ import time
 
 st.set_page_config(
     page_title="Zenith", 
-    page_icon="🏔️", 
+    page_icon="", 
     layout="wide" if st.session_state.get("authenticated") else "centered", 
     initial_sidebar_state="expanded"
 )
